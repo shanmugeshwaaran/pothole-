@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>AI Dashcam - Pothole GO</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background: #f3f4f6; }
+        
+        header { background: #1f2937; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        header h2 { margin: 0; font-size: 20px; }
+        header nav { display: flex; align-items: center; }
+        header nav a { color: #9ca3af; text-decoration: none; margin-left: 15px; font-size: 14px; }
+        header nav a.active { color: #ffffff; font-weight: bold; }
+        
+        .container { padding: 30px; max-width: 800px; margin: 0 auto; text-align: center; }
+        
+        .video-container { background: #000; border-radius: 12px; padding: 10px; margin-bottom: 20px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); position: relative;}
+        
+        img.ai-stream { width: 100%; max-width: 600px; border-radius: 8px; border: 2px solid #ef4444; background: #222; }
+        
+        #scanner-status { margin-top: 10px; font-weight: bold; color: #ef4444; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+
+        #gps-status { margin-top: 15px; font-weight: bold; color: #b91c1c; background: #fee2e2; padding: 10px; border-radius: 8px; display: inline-block; border: 1px solid #f87171;}
+
+        @media (max-width: 768px) {
+            header { flex-direction: column; align-items: flex-start; }
+            header nav { margin-top: 15px; flex-wrap: wrap; gap: 10px; }
+            header nav a { margin-left: 0; background: #374151; padding: 8px 12px; border-radius: 4px; }
+            .container { padding: 15px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>🚧 AI Dashcam Scanner</h2>
+        <nav>
+            <a href="/admin/dashboard">Dashboard</a>
+            <a href="/admin/map">Map</a>
+            <a href="/admin/potholes">List</a>
+            <a href="/admin/reports">Reports</a>
+            <a href="/admin/dashcam" class="active">Camera</a>
+        </nav>
+    </header>
+    
+    <div class="container">
+        <div class="video-container">
+            <img class="ai-stream" src="{{ url_for('video_feed') }}" alt="Live AI Camera Feed">
+        </div>
+        
+        <div id="scanner-status">🔴 REC - Real AI is actively scanning the road...</div>
+        <div id="gps-status">📍 Acquiring live GPS signal...</div>
+
+        <p style="color:#6b7280; font-size: 14px; margin-top:20px;">
+            Drive slowly. The YOLO model is processing this video feed directly on the server. Please allow location permissions.
+        </p>
+    </div>
+
+    <script>
+        if (navigator.geolocation) {
+            navigator.geolocation.watchPosition(
+                function(position) {
+                    const lat = position.coords.latitude;
+                    const lng = position.coords.longitude;
+                    document.getElementById('gps-status').innerText = `📍 Live GPS Active: ${lat.toFixed(4)}, ${lng.toFixed(4)}`;
+                    fetch('/api/update_location', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ latitude: lat, longitude: lng })
+                    });
+                },
+                function(error) { document.getElementById('gps-status').innerText = "⚠️ GPS Permission Denied! Using default location."; },
+                { enableHighAccuracy: true }
+            );
+        } else {
+            document.getElementById('gps-status').innerText = "⚠️ GPS not supported by this browser";
+        }
+    </script>
+</body>
+</html>

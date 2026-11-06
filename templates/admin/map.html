@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Admin Map - Pothole GO</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        body { margin: 0; padding: 0; font-family: sans-serif; display: flex; flex-direction: column; height: 100vh; background: #f3f4f6; }
+        
+        /* Mobile-Friendly Header */
+        header { background: #1f2937; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; }
+        header h2 { margin: 0; font-size: 20px; }
+        header nav { display: flex; align-items: center; }
+        header nav a { color: #9ca3af; text-decoration: none; margin-left: 15px; font-size: 14px; }
+        header nav a.active { color: #ffffff; font-weight: bold; }
+        
+        #map { flex-grow: 1; width: 100%; cursor: crosshair; } 
+        
+        /* Mobile CSS Overrides */
+        @media (max-width: 768px) {
+            header { flex-direction: column; align-items: flex-start; }
+            header nav { margin-top: 15px; flex-wrap: wrap; gap: 10px; }
+            header nav a { margin-left: 0; background: #374151; padding: 8px 12px; border-radius: 4px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>🗺️ Live Hazard Map</h2>
+        <nav>
+            <a href="/admin/dashboard">Dashboard</a>
+            <a href="/admin/map" class="active">Map</a>
+            <a href="/admin/potholes">List</a>
+            <a href="/admin/reports">Reports</a>
+            <a href="/admin/dashcam">Camera</a>
+        </nav>
+    </header>
+    
+    <div id="map"></div>
+    
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Default map centre (Chennai city centre)
+        const defaultCenter = [13.0827, 80.2707];
+        const defaultZoom = 13;
+        const chennaiBounds = L.latLngBounds([12.7500, 80.0000], [13.3500, 80.4000]);
+
+        let map;
+        let allMarkers = [];
+
+        // Initialise the Leaflet map with given coordinates
+        function initMapView(lat, lng) {
+            map = L.map('map', {
+                maxBounds: chennaiBounds,
+                maxBoundsViscosity: 1.0,
+                minZoom: 11
+            }).setView([lat, lng], defaultZoom);
+            L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 19 }).addTo(map);
+            attachMapEvents();
+        }
+
+        // Attach click handler and start data refresh loops
+        function attachMapEvents() {
+            map.on('click', function(e) {
+                const tempPopup = L.popup()
+                    .setLatLng(e.latlng)
+                    .setContent("<b style='color:#ea580c;'>Adding hazard...</b>")
+                    .openOn(map);
+                fetch('/api/potholes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ latitude: e.latlng.lat, longitude: e.latlng.lng, status: 'pending', image_url: '' })
+                })
+                .then(res => res.json())
+                .then(() => {
+                    map.closePopup(tempPopup);
+                    loadMapData();
+                });
+            });
+            loadMapData();
+            setInterval(loadMapData, 10000);
+        }
+
+        // Fetch pothole data and render markers
+        function loadMapData() {
+            fetch('/api/potholes')
+                .then(res => res.json())
+                .then(data => {
+                    allMarkers.forEach(m => map.removeLayer(m));
+                    allMarkers = [];
+                    data.forEach(p => {
+                        const dotColor = p.status === 'pending' ? '#ef4444' : (p.status === 'review' ? '#f59e0b' : '#22c55e');
+                        const marker = L.circleMarker([p.latitude, p.longitude], {
+                            radius: 8,
+                            fillColor: dotColor,
+                            color: '#fff',
+                            weight: 2,
+                            fillOpacity: 1
+                        }).addTo(map);
+                        marker.bindTooltip(`<b>Hazard #${p.id}</b><br>Status: ${p.status.toUpperCase()}`, {
+                            direction: 'top',
+                            opacity: 0.9
+                        });
+                        allMarkers.push(marker);
+                    });
+                });
+        }
+
+        // Geolocation wrapper – safe fallback to default centre
+        function initGeolocation() {
+            if (!navigator.geolocation) {
+                initMapView(...defaultCenter);
+                return;
+            }
+            const geoOptions = { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 };
+            navigator.geolocation.getCurrentPosition(
+                pos => {
+                    initMapView(pos.coords.latitude, pos.coords.longitude);
+                },
+                err => {
+                    if (err.code === 1 || err.code === 3) {
+                        showGeolocationBanner();
+                    }
+                    initMapView(...defaultCenter);
+                },
+                geoOptions
+            );
+        }
+
+        // Dismissible banner for blocked location access
+        function showGeolocationBanner() {
+            const banner = document.createElement('div');
+            banner.id = 'geo-banner';
+            banner.style.position = 'fixed';
+            banner.style.top = '0';
+            banner.style.left = '0';
+            banner.style.right = '0';
+            banner.style.background = '#fff8e1';
+            banner.style.color = '#333';
+            banner.style.padding = '10px 20px';
+            banner.style.zIndex = '2000';
+            banner.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+            banner.style.display = 'flex';
+            banner.style.justifyContent = 'space-between';
+            banner.style.alignItems = 'center';
+            banner.innerHTML = `
+                <span>Location access is blocked in browser settings. Showing default Chennai map view.</span>
+                <button id="geo-banner-close" style="background:none;border:none;font-size:16px;cursor:pointer;">✕</button>
+            `;
+            document.body.appendChild(banner);
+            document.getElementById('geo-banner-close').onclick = () => banner.remove();
+        }
+
+        // Kick‑off the map initialisation
+        initGeolocation();
+    </script>
+</body>
+</html>

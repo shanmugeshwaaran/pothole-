@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Pothole GO - Navigation</title>
+    
+    <!-- Core Leaflet & Routing Libraries -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css" />
+    
+    <style>
+        /* Base Reset */
+        body, html { margin: 0; padding: 0; width: 100vw; height: 100vh; overflow: hidden; font-family: sans-serif; background: #f3f4f6; }
+        #map { width: 100%; height: 100%; position: absolute; top: 0; left: 0; z-index: 1; }
+        
+        /* GPS Permission Modal */
+        #gps-modal {
+            position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+            background: rgba(0,0,0,0.7); z-index: 10000; display: flex;
+            align-items: center; justify-content: center;
+        }
+        .gps-modal-content {
+            background: white; padding: 25px; border-radius: 12px;
+            text-align: center; width: 85%; max-width: 350px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+        .gps-btn {
+            background: #3b82f6; color: white; border: none; padding: 12px;
+            border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer;
+            width: 100%; margin-top: 15px; transition: 0.2s;
+        }
+        .gps-btn:active { background: #2563eb; transform: scale(0.95); }
+
+        /* Custom Search Panel */
+        .custom-search-panel {
+            position: absolute; top: 60px; left: 50%; transform: translateX(-50%); width: 90%; max-width: 400px;
+            background: white; padding: 10px; border-radius: 12px; box-shadow: 0 6px 15px rgba(0,0,0,0.3); z-index: 1000;
+        }
+        .custom-search-panel input {
+            flex: 1; padding: 12px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 15px; outline: none; width: 100%; box-sizing: border-box;
+        }
+        .custom-search-panel button {
+            background: #3b82f6; color: white; border: none; padding: 0 20px; border-radius: 8px;
+            font-size: 15px; font-weight: bold; cursor: pointer; white-space: nowrap; margin-left: 8px;
+        }
+        .suggestions-dropdown {
+            list-style: none; padding: 0; margin: 8px 0 0 0; max-height: 220px; overflow-y: auto;
+            border-radius: 8px; display: none; border: 1px solid #e5e7eb; background: white;
+        }
+        .suggestions-dropdown li {
+            padding: 12px; border-bottom: 1px solid #f3f4f6; font-size: 14px; cursor: pointer; color: #374151;
+        }
+        .suggestions-dropdown li:hover { background: #f3f4f6; font-weight: bold; }
+
+        /* UI Overlays */
+        #city-stats {
+            position: absolute; top: 15px; right: 15px; z-index: 1000;
+            background: #fffbeb; color: #b45309; padding: 8px 12px; border-radius: 20px;
+            font-size: 13px; font-weight: bold; border: 1px solid #fde68a; box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+
+        .go-slow-banner {
+            position: absolute; top: 22%; left: 50%; transform: translateX(-50%);
+            background: #ef4444; color: white; padding: 20px 30px; border-radius: 12px; 
+            text-align: center; z-index: 9999; display: none; border: 4px solid white;
+            box-shadow: 0 10px 25px rgba(239, 68, 68, 0.6); animation: pulseRed 0.6s infinite alternate; width: 80%; max-width: 300px;
+        }
+        @keyframes pulseRed { 0% { transform: translateX(-50%) scale(1); opacity: 1; } 100% { transform: translateX(-50%) scale(1.05); opacity: 0.85; } }
+
+        .map-btn {
+            position: absolute; right: 20px; z-index: 1000; background: white;
+            color: #1f2937; border: 2px solid #ccc; padding: 12px 16px;
+            border-radius: 50px; font-weight: bold; font-size: 14px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.2); cursor: pointer; transition: 0.3s;
+        }
+        #recenter-btn { bottom: 30px; }
+        #report-hazard-btn { bottom: 85px; background: #ea580c; color: white; border: none; }
+        
+        .leaflet-routing-container { display: none !important; }
+    </style>
+</head>
+<body>
+
+    <!-- GPS Request Modal -->
+    <div id="gps-modal">
+        <div class="gps-modal-content">
+            <h2 style="margin-top:0;">📍 Location Required</h2>
+            <p style="color: #4b5563; font-size: 15px;">Pothole GO needs your GPS location to provide live navigation and hazard alerts.</p>
+            <button class="gps-btn" onclick="requestGPS()">Allow GPS Access</button>
+        </div>
+    </div>
+
+    <div id="city-stats">📊 Active Hazards: 0 | Locating...</div>
+
+    <!-- Custom Search Panel -->
+    <div class="custom-search-panel">
+        <div style="display: flex;">
+            <input type="text" id="dest-input" placeholder="Search area (e.g., Anna Nagar)...">
+            <button onclick="searchLocation()">Search</button>
+        </div>
+        <ul id="suggestions-list" class="suggestions-dropdown"></ul>
+    </div>
+
+    <!-- Go Slow Alert -->
+    <div id="go-slow-alert" class="go-slow-banner">
+        <h1 style="margin:0; font-size: 32px;">⚠️ GO SLOW</h1>
+        <p id="go-slow-reason" style="margin:8px 0 0 0; font-size: 16px;"></p>
+    </div>
+
+    <div id="map"></div>
+    
+    <input type="file" id="camera-input" accept="image/*" capture="environment" style="display:none;" onchange="submitPhoto(event)">
+    
+    <button id="report-hazard-btn" class="map-btn" onclick="toggleReportMode()">🚨 Report Hazard</button>
+    <button id="recenter-btn" class="map-btn" onclick="recenterGPS()">📍 Re-Center</button>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@6/turf.min.js"></script>
+
+    <script>
+        // Check if GPS was already granted to hide the modal automatically
+        if (navigator.permissions) {
+            navigator.permissions.query({ name: 'geolocation' }).then(function(result) {
+                if (result.state === 'granted') {
+                    document.getElementById('gps-modal').style.display = 'none';
+                    startGPS();
+                }
+            });
+        }
+
+        function requestGPS() {
+            document.getElementById('gps-modal').style.display = 'none';
+            startGPS();
+        }
+
+        const map = L.map('map', { zoomControl: false }).setView([13.0827, 80.2707], 14);
+        L.tileLayer('https://mt1.google.com/vt/lyrs=m&x={x}&y={y}&z={z}', { maxZoom: 19 }).addTo(map);
+
+        const routingControl = L.Routing.control({
+            waypoints: [], showAlternatives: false, fitSelectedRoutes: true,
+            createMarker: function(i, wp) { return i === 0 ? null : L.marker(wp.latLng); },
+            lineOptions: { styles: [{color: '#3b82f6', opacity: 0.9, weight: 6}] }
+        }).addTo(map);
+
+        let allPotholes = [], allMarkers = [], userMarker = null, userCoords = null;
+        let isReportingMode = false, pendingCoords = null, activePotholeId = null;
+
+        // Custom Search Logic
+        const destInput = document.getElementById('dest-input');
+        const suggList = document.getElementById('suggestions-list');
+        let searchTimeout;
+
+        destInput.addEventListener('input', function() {
+            clearTimeout(searchTimeout);
+            let q = this.value;
+            if(q.length < 3) { suggList.style.display = 'none'; return; }
+            searchTimeout = setTimeout(() => {
+                fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=in&limit=5`)
+                .then(res => res.json()).then(data => {
+                    suggList.innerHTML = '';
+                    if(data.length > 0) {
+                        suggList.style.display = 'block';
+                        data.forEach(place => {
+                            let li = document.createElement('li');
+                            li.innerText = place.display_name.split(',').slice(0, 3).join(', ');
+                            li.onclick = () => { destInput.value = li.innerText; suggList.style.display = 'none'; drawRoute(place.lat, place.lon); };
+                            suggList.appendChild(li);
+                        });
+                    } else suggList.style.display = 'none';
+                });
+            }, 400);
+        });
+
+        function searchLocation() {
+            let q = destInput.value;
+            if(q.length < 3) return;
+            fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&countrycodes=in&limit=1`)
+            .then(res => res.json()).then(data => {
+                if(data.length > 0) { suggList.style.display = 'none'; drawRoute(data[0].lat, data[0].lon); } 
+                else alert("Location not found! Try adding the city name.");
+            });
+        }
+
+        function drawRoute(lat, lon) {
+            if(!userCoords) { alert("Waiting for live GPS connection..."); return; }
+            routingControl.setWaypoints([L.latLng(userCoords[0], userCoords[1]), L.latLng(lat, lon)]);
+        }
+
+        // Pothole Logic
+        const cityStats = document.getElementById('city-stats');
+        function loadHazards() {
+            fetch('/api/potholes').then(res => res.json()).then(data => {
+                allMarkers.forEach(m => map.removeLayer(m)); allMarkers = [];
+                allPotholes = data.filter(p => p.status === 'pending' || p.status === 'DISCOVERED' || p.status === 'REVIEW');
+                cityStats.innerHTML = `📊 Active Hazards: ${allPotholes.length}`;
+                
+                allPotholes.forEach(p => {
+                    const marker = L.circleMarker([p.latitude, p.longitude], { radius: 9, fillColor: '#ef4444', color: '#fff', weight: 2, fillOpacity: 1 }).addTo(map);
+                    let imgHtml = p.image_url ? `<img src="${p.image_url}" style="width:100%; max-height:120px; border-radius:6px; margin-bottom:8px; object-fit:cover;">` : ``;
+                    marker.bindPopup(`<div style="text-align:center;"><b>Community Verification</b><br>${imgHtml}<button style="background:#3b82f6; color:white; border:none; padding:8px; border-radius:6px; cursor:pointer; width:100%; margin-top:5px;" onclick="triggerCamera(${p.id})">📸 Upload Fix Proof</button><button style="background:#ef4444; color:white; border:none; padding:8px; border-radius:6px; cursor:pointer; width:100%; margin-top:5px;" onclick="markBroken(${p.id})">❌ Still Broken</button></div>`);
+                    allMarkers.push(marker);
+                });
+            });
+        }
+        loadHazards(); setInterval(loadHazards, 5000);
+
+        function toggleReportMode() {
+            isReportingMode = !isReportingMode;
+            const btn = document.getElementById('report-hazard-btn');
+            if (isReportingMode) {
+                btn.innerText = "❌ Cancel Report"; btn.style.background = "#ef4444";
+                map.on('click', handleMapClick); alert("📍 Tap the map where the pothole is located.");
+            } else {
+                btn.innerText = "🚨 Report Hazard"; btn.style.background = "#ea580c";
+                map.off('click', handleMapClick);
+            }
+        }
+
+        function handleMapClick(e) { pendingCoords = [e.latlng.lat, e.latlng.lng]; activePotholeId = null; document.getElementById('camera-input').click(); toggleReportMode(); }
+        function triggerCamera(id) { activePotholeId = id; pendingCoords = null; document.getElementById('camera-input').click(); }
+        
+        function submitPhoto(event) {
+            const file = event.target.files[0]; if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                if (activePotholeId !== null) fetch(`/api/potholes/${activePotholeId}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'review', fixed_image_url: e.target.result }) }).then(() => { alert("Proof submitted."); loadHazards(); });
+                else if (pendingCoords !== null) fetch('/api/potholes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ latitude: pendingCoords[0], longitude: pendingCoords[1], status: 'pending', image_url: e.target.result }) }).then(() => { alert("Hazard reported!"); loadHazards(); });
+            }; reader.readAsDataURL(file);
+        }
+
+        function markBroken(id) { fetch(`/api/potholes/${id}/status`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status: 'pending' }) }).then(() => { alert("Updated."); loadHazards(); }); }
+
+        // GPS & Proximity
+        const goSlowAlert = document.getElementById('go-slow-alert');
+        const goSlowReason = document.getElementById('go-slow-reason');
+
+        function startGPS() {
+            if ("geolocation" in navigator) {
+                navigator.geolocation.watchPosition(
+                    position => {
+                        userCoords = [position.coords.latitude, position.coords.longitude];
+                        if (!userMarker) {
+                            userMarker = L.circleMarker(userCoords, { radius: 8, fillColor: '#3b82f6', color: '#fff', weight: 3, fillOpacity: 1 }).addTo(map);
+                            map.setView(userCoords, 16);
+                        } else userMarker.setLatLng(userCoords);
+                        checkProximity();
+                    },
+                    err => {
+                        console.error("GPS Error:", err);
+                        if(err.code === 1) alert("Location blocked. Please allow access in browser settings.");
+                        else alert("Cannot fetch GPS. Ensure your device location is turned on.");
+                    },
+                    { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+                );
+            }
+        }
+
+        function recenterGPS() { if (userCoords) map.setView(userCoords, 16); }
+
+        function checkProximity() {
+            if (!userCoords || allPotholes.length === 0) return;
+            let hazardsAhead = 0, minDistance = 9999;
+            const userPt = turf.point([userCoords[1], userCoords[0]]);
+            allPotholes.forEach(p => {
+                const dist = turf.distance(userPt, turf.point([p.longitude, p.latitude]), {units: 'meters'});
+                if (dist <= 50) { hazardsAhead++; if (dist < minDistance) minDistance = dist; }
+            });
+
+            if (hazardsAhead > 0) {
+                goSlowAlert.style.display = "block";
+                let txt = `<br><span style="font-size: 20px; font-weight: 900;">📏 ${Math.round(minDistance)}m away</span>`;
+                goSlowReason.innerHTML = hazardsAhead >= 2 ? `<b>Type:</b> 🛣️ Cluster Hazard (${hazardsAhead})` + txt : "<b>Type:</b> ⚠️ Single Pothole" + txt;
+            } else goSlowAlert.style.display = "none";
+        }
+    </script>
+</body>
+</html>

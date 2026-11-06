@@ -1,0 +1,67 @@
+# ── Environment & Secrets ─────────────────────────────────────────────────────
+.env
+.env.*
+.env.local
+.env.*.local
+
+# ── Python ─────────────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# ── Virtual Environments ───────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# ── Databases (local SQLite files – never commit prod data) ───────────────────
+*.db
+*.sqlite
+*.sqlite3
+
+# ── AI Model Weights (large binary – distribute separately) ───────────────────
+*.pt
+*.pth
+*.onnx
+*.weights
+
+# ── Logs ───────────────────────────────────────────────────────────────────────
+*.log
+logs/
+
+# ── Node / Frontend (if added in future) ──────────────────────────────────────
+node_modules/
+.next/
+dist/
+build/
+
+# ── OS & Editor Junk ──────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# ── Ngrok Binaries & Zips ─────────────────────────────────────────────────────
+*.exe
+*.zip
+ngrok-v3-stable-windows-amd64/
+

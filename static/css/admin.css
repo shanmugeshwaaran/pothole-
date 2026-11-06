@@ -1,0 +1,49 @@
+/* =========================================
+   ADMIN DASHBOARD BASE STYLES
+   ========================================= */
+body { margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; display: flex; height: 100vh; background-color: #f3f4f6; overflow: hidden; }
+
+/* Split Screen Layout */
+.dashboard-container { display: flex; width: 100%; height: 100%; flex-direction: row; }
+
+/* Sidebar (Left side list) */
+.sidebar { width: 350px; background: white; box-shadow: 2px 0 10px rgba(0,0,0,0.1); display: flex; flex-direction: column; z-index: 20; }
+.sidebar-header { background: #1f2937; color: white; padding: 20px; text-align: center; }
+.sidebar-header h2 { margin: 0; font-size: 20px; }
+.sidebar-header p { margin: 5px 0 0 0; font-size: 12px; color: #9ca3af; }
+
+.table-container { flex: 1; overflow-y: auto; padding: 10px; }
+
+/* Main Map Area (Right side) */
+.main-content { flex: 1; display: flex; flex-direction: column; position: relative; }
+#map { flex: 1; width: 100%; height: 100%; }
+
+/* =========================================
+   TABLE & LIST STYLES
+   ========================================= */
+.pothole-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+.pothole-table th, .pothole-table td { padding: 12px 10px; border-bottom: 1px solid #e5e7eb; text-align: left; font-size: 13px; }
+.pothole-table th { font-weight: bold; color: #4b5563; position: sticky; top: 0; background: white; z-index: 10; }
+
+/* Status Badges */
+.badge { padding: 4px 8px; border-radius: 999px; font-size: 11px; font-weight: bold; text-transform: uppercase; }
+.badge-pending { background: #fee2e2; color: #ef4444; border: 1px solid #f87171; }
+.badge-fixed { background: #dcfce3; color: #22c55e; border: 1px solid #4ade80; }
+
+/* Action Buttons */
+.action-btns { display: flex; gap: 5px; }
+.btn { padding: 5px 8px; border: none; border-radius: 4px; cursor: pointer; font-size: 12px; font-weight: bold; transition: 0.2s; }
+.btn-edit { background: #3b82f6; color: white; }
+.btn-edit:hover { background: #2563eb; }
+.btn-delete { background: #ef4444; color: white; }
+.btn-delete:hover { background: #dc2626; }
+
+/* Map click instruction banner */
+.admin-instruction { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); background: white; padding: 10px 20px; border-radius: 8px; font-weight: bold; box-shadow: 0 4px 6px rgba(0,0,0,0.1); z-index: 1000; border: 2px solid #3b82f6; }
+
+/* Mobile view adjustments */
+@media screen and (max-width: 768px) {
+    .dashboard-container { flex-direction: column; }
+    .sidebar { width: 100%; height: 40%; flex: none; }
+    .main-content { height: 60%; }
+}

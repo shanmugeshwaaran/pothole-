@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Customer Submissions - Pothole GO</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background: #f3f4f6; }
+        header { background: #1f2937; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        header h2 { margin: 0; font-size: 20px; }
+        header nav a { color: #9ca3af; text-decoration: none; margin-left: 15px; font-size: 14px; }
+        header nav a.active { color: #ffffff; font-weight: bold; }
+        
+        .container { padding: 30px; max-width: 1200px; margin: 0 auto; }
+        table { width: 100%; background: white; border-collapse: collapse; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #e5e7eb; }
+        th { background: #f9fafb; font-weight: bold; color: #4b5563; }
+        .thumbnail { max-height: 60px; border-radius: 4px; border: 1px solid #ccc; }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>📥 Customer Inbox (New Reports)</h2>
+            <nav>
+            <a href="/admin/dashboard">Dashboard</a>
+            <a href="/admin/map">Map</a>
+            <a href="/admin/potholes" class="active">List</a>
+            <!-- Inbox link removed from here -->
+            <a href="/admin/reports">Reports Log</a>
+            <a href="/admin/dashcam">Camera</a>
+        </nav>
+    </header>
+    
+    <div class="container">
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Coordinates</th>
+                    <th>Customer Photo</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody id="table-body">
+                <!-- Rows injected via JS -->
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        function loadSubmissions() {
+            fetch('/api/potholes')
+                .then(res => res.json())
+                .then(data => {
+                    const tbody = document.getElementById('table-body');
+                    tbody.innerHTML = '';
+                    
+                    // Filter for only UNVERIFIED submissions from customers
+                    let unverified = data.filter(p => p.status === 'unverified');
+
+                    if (unverified.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="4" style="text-align:center; color:#6b7280;">No new customer reports! 🎉</td></tr>`;
+                        return;
+                    }
+
+                    unverified.forEach(p => {
+                        let photoHtml = p.image_url ? `<img src="${p.image_url}" class="thumbnail">` : `No Photo`;
+                        tbody.innerHTML += `
+                            <tr>
+                                <td>#${p.id}</td>
+                                <td>${p.latitude.toFixed(4)}, ${p.longitude.toFixed(4)}</td>
+                                <td>${photoHtml}</td>
+                                <td>
+                                    <button style="background:#22c55e; color:white; border:none; padding:6px; border-radius:4px; cursor:pointer;" onclick="changeStatus(${p.id}, 'pending')">✅ Approve (Send to Map)</button>
+                                    <button style="background:#ef4444; color:white; border:none; padding:6px; border-radius:4px; cursor:pointer;" onclick="deleteP(${p.id})">❌ Delete Fake</button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                });
+        }
+
+        function changeStatus(id, newStatus) {
+            fetch(`/api/potholes/${id}/status`, {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            }).then(() => loadSubmissions());
+        }
+
+        function deleteP(id) { 
+            fetch(`/api/potholes/${id}`, {method: 'DELETE'}).then(() => loadSubmissions()); 
+        }
+
+        loadSubmissions();
+    </script>
+</body>
+</html>

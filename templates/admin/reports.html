@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Sent Reports - Pothole GO</title>
+    <style>
+        body { font-family: sans-serif; margin: 0; background: #f3f4f6; }
+        
+        /* Mobile-Friendly Header */
+        header { background: #1f2937; color: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; }
+        header h2 { margin: 0; font-size: 20px; }
+        header nav { display: flex; align-items: center; }
+        header nav a { color: #9ca3af; text-decoration: none; margin-left: 15px; font-size: 14px; }
+        header nav a.active { color: #ffffff; font-weight: bold; }
+        
+        .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+        
+        /* Responsive Table Wrapper */
+        .table-wrapper { width: 100%; overflow-x: auto; background: white; border-radius: 8px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        table { width: 100%; min-width: 650px; border-collapse: collapse; }
+        th, td { padding: 15px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 14px; }
+        th { background: #f9fafb; font-weight: bold; color: #4b5563; }
+        
+        .map-link { color: #3b82f6; text-decoration: none; font-weight: bold; }
+        .map-link:hover { text-decoration: underline; }
+        .btn-delete { background: #ef4444; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+
+        /* Mobile CSS Overrides */
+        @media (max-width: 768px) {
+            header { flex-direction: column; align-items: flex-start; }
+            header nav { margin-top: 15px; flex-wrap: wrap; gap: 10px; }
+            header nav a { margin-left: 0; background: #374151; padding: 8px 12px; border-radius: 4px; }
+            .container { padding: 10px; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h2>📂 Official Complaint Logs</h2>
+        <nav>
+            <a href="/admin/dashboard">Dashboard</a>
+            <a href="/admin/map">Map</a>
+            <a href="/admin/potholes">List</a>
+            <a href="/admin/reports" class="active">Reports</a>
+            <a href="/admin/dashcam">Camera</a>
+        </nav>
+    </header>
+    
+    <div class="container">
+        <!-- New Swipeable Wrapper -->
+        <div class="table-wrapper">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Report ID</th>
+                        <th>Date Sent</th>
+                        <th>Hazard ID</th>
+                        <th>Location</th>
+                        <th>Notes</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body">
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        function loadReports() {
+            fetch('/api/reports')
+                .then(res => res.json())
+                .then(data => {
+                    const tbody = document.getElementById('table-body');
+                    tbody.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; color:#6b7280; padding:20px;">No reports have been filed yet.</td></tr>`;
+                        return;
+                    }
+
+                    data.forEach(r => {
+                        let coordsNoSpace = r.coordinates.replace(' ', '');
+                        let mapUrl = `https://www.google.com/maps/search/?api=1&query=${coordsNoSpace}`;
+                        
+                        tbody.innerHTML += `
+                            <tr>
+                                <td><b>#${r.id}</b></td>
+                                <td style="font-size:12px;">${r.timestamp}</td>
+                                <td><span style="background:#fee2e2; color:#ef4444; padding:4px 8px; border-radius:4px; font-weight:bold; font-size:12px;">#${r.pothole_id}</span></td>
+                                <td><a href="${mapUrl}" target="_blank" class="map-link">📍 Map</a><br><span style="font-size:11px; color:#6b7280;">${r.coordinates}</span></td>
+                                <td>${r.notes || '<i>No notes</i>'}</td>
+                                <td><button class="btn-delete" onclick="deleteReport(${r.id})">🗑️ Delete</button></td>
+                            </tr>
+                        `;
+                    });
+                });
+        }
+        function deleteReport(id) { if (confirm("Delete this report log?")) { fetch(`/api/reports/${id}`, { method: 'DELETE' }).then(() => loadReports()); } }
+        loadReports();
+    </script>
+</body>
+</html>
